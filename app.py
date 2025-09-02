@@ -322,3 +322,10 @@ if st.session_state["detections"]:
     st.dataframe(hist_df, use_container_width=True)
 else:
     st.info("No tickers loaded yet.")
+hide_streamlit_style = """
+            <style>
+            #MainMenu {visibility: hidden;}
+            footer {visibility: hidden;}
+            </style>
+            """
+st.markdown(hide_streamlit_style, unsafe_allow_html=True) 
