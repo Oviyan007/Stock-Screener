@@ -16,14 +16,9 @@ def detect_double_bottom(
     lookback: int = 200,
     order: int = 3,
     price_tolerance: float = 0.03,
-    require_breakout: bool = True
-) -> Optional[Dict[str, Any]]:
-    """
-    Double bottom (W):
-      - two local minima within tolerance
-      - a middle peak (neckline) between them
-      - optional: last close > neckline (breakout)
-    """
+    require_breakout: bool = True,
+    early_alert: bool = False
+):
     if df is None or df.empty or "close" not in df.columns:
         return None
 
@@ -47,42 +42,48 @@ def detect_double_bottom(
         if abs(low2 - low1) / max(low1, low2) > price_tolerance:
             continue
 
-        # Find neckline = highest point between the two lows
+        # Neckline = highest point between lows
         mid_slice = vals[i1:i2+1]
         mid_rel = int(np.argmax(mid_slice))
         mid_idx = i1 + mid_rel
         neckline = float(vals[mid_idx])
 
         recent_close = float(vals[-1])
+
+        # --- EARLY ALERT ---
+        if early_alert and recent_close >= neckline:
+            return {
+                "pattern": "double_bottom_early",
+                "low1": float(low1),
+                "low2": float(low2),
+                "neckline": neckline,
+                "detected_at": idxs[-1],
+                "confirmed": False
+            }
+
+        # --- REGULAR CONFIRMATION ---
         if require_breakout and not (recent_close > neckline):
             continue
 
         return {
             "pattern": "double_bottom",
-            "t1": idxs[i1],
-            "t2": idxs[i2],
             "low1": float(low1),
             "low2": float(low2),
-            "neckline_time": idxs[mid_idx],
             "neckline": neckline,
-            "confirmed": bool(recent_close > neckline),
             "detected_at": idxs[-1],
+            "confirmed": True
         }
     return None
+
 
 def detect_double_top(
     df: pd.DataFrame,
     lookback: int = 200,
     order: int = 3,
     price_tolerance: float = 0.03,
-    require_breakout: bool = True
-) -> Optional[Dict[str, Any]]:
-    """
-    Double top (N):
-      - two local maxima within tolerance
-      - a middle trough between them
-      - optional: last close < neckline (breakdown)
-    """
+    require_breakout: bool = True,
+    early_alert: bool = False
+):
     if df is None or df.empty or "close" not in df.columns:
         return None
 
@@ -106,40 +107,46 @@ def detect_double_top(
         if abs(high2 - high1) / max(high1, high2) > price_tolerance:
             continue
 
-        # Neckline = lowest point between the two highs
+        # Neckline = lowest point between highs
         mid_slice = vals[i1:i2+1]
         mid_rel = int(np.argmin(mid_slice))
         mid_idx = i1 + mid_rel
         neckline = float(vals[mid_idx])
 
         recent_close = float(vals[-1])
+
+        # --- EARLY ALERT ---
+        if early_alert and recent_close <= neckline:
+            return {
+                "pattern": "double_top_early",
+                "high1": float(high1),
+                "high2": float(high2),
+                "neckline": neckline,
+                "detected_at": idxs[-1],
+                "confirmed": False
+            }
+
+        # --- REGULAR CONFIRMATION ---
         if require_breakout and not (recent_close < neckline):
             continue
 
         return {
             "pattern": "double_top",
-            "t1": idxs[i1],
-            "t2": idxs[i2],
             "high1": float(high1),
             "high2": float(high2),
-            "neckline_time": idxs[mid_idx],
             "neckline": neckline,
-            "confirmed": bool(recent_close < neckline),
             "detected_at": idxs[-1],
+            "confirmed": True
         }
     return None
-def detect_patterns(df: pd.DataFrame):
-    """
-    Run all pattern detections and return a list of results.
-    """
-    results = []
 
-    db = detect_double_bottom(df)
+
+def detect_patterns(df: pd.DataFrame, early_alert: bool = False):
+    results = []
+    db = detect_double_bottom(df, early_alert=early_alert)
     if db:
         results.append(db)
-
-    dt = detect_double_top(df)
+    dt = detect_double_top(df, early_alert=early_alert)
     if dt:
         results.append(dt)
-
     return results
